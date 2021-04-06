@@ -8,6 +8,9 @@ import hashlib
 from datetime import datetime, timedelta
 import os
 import re
+import hmac
+import urllib.parse
+import json
 
 
 # 喜马拉雅极速版
@@ -25,6 +28,8 @@ BARK = ''                   # bark服务,自行搜索; secrets可填;形如jfjqx
 SCKEY = ''                  # Server酱的SCKEY; secrets可填
 TG_BOT_TOKEN = ''           # telegram bot token 自行申请
 TG_USER_ID = ''             # telegram 用户ID
+DD_BOT_TOKEN = ''           # 钉钉
+DD_BOT_SECRET = ''          # 钉钉
 
 ###################################################
 # 对应方案1:  GitHub action自动运行,此处无需填写;
@@ -50,6 +55,10 @@ if "XMLY_SPEED_COOKIE" in os.environ:
         TG_BOT_TOKEN = os.environ["TG_BOT_TOKEN"]
         TG_USER_ID = os.environ["TG_USER_ID"]
         print("Telegram 推送打开")
+    if "DD_BOT_TOKEN" in os.environ and os.environ["DD_BOT_TOKEN"] and "DD_BOT_SECRET" in os.environ and os.environ["DD_BOT_SECRET"]:
+        DD_BOT_TOKEN = os.environ["DD_BOT_TOKEN"]
+        DD_BOT_SECRET = os.environ["DD_BOT_SECRET"]
+        print("钉钉 推送打开")
 
 
 ###################################################
@@ -1037,6 +1046,28 @@ def telegram_bot(title, content):
         url='https://api.telegram.org/bot%s/sendMessage' % (tg_bot_token), data=send_data)
     print(response.text)
 
+def dingding_bot(title, content):
+        timestamp = str(round(time.time() * 1000))  # 时间戳
+        access_token = os.environ.get('DD_BOT_TOKEN')
+        secret = os.environ.get('DD_BOT_SECRET')
+        secret_enc = secret.encode('utf-8')
+        string_to_sign = '{}\n{}'.format(timestamp, secret)
+        string_to_sign_enc = string_to_sign.encode('utf-8')
+        hmac_code = hmac.new(secret_enc, string_to_sign_enc, digestmod=hashlib.sha256).digest()
+        sign = urllib.parse.quote_plus(base64.b64encode(hmac_code))  # 签名
+        print('开始使用 钉钉机器人 推送消息...', end='')
+        url = f'https://oapi.dingtalk.com/robot/send?access_token={access_token}&timestamp={timestamp}&sign={sign}'
+        headers = {'Content-Type': 'application/json;charset=utf-8'}
+        data = {
+            'msgtype': 'text',
+            'text': {'content': f'{title}\n\n{content}'}
+        }
+        response = requests.post(url=url, data=json.dumps(data), headers=headers, timeout=15).json()
+        if not response['errcode']:
+            print('推送成功！')
+        else:
+            print('推送失败！')
+
 
 def run():
     print(f"喜马拉雅极速版 (https://github.com/Zero-S1/xmly_speed/blob/master/xmly_speed.md ) ,欢迎打赏¯\(°_o)/¯")
@@ -1084,6 +1115,7 @@ def run():
         bark("⏰ 喜马拉雅极速版", message)
         serverJ("⏰ 喜马拉雅极速版", message)
         telegram_bot("⏰ 喜马拉雅极速版", message)
+        dingding_bot("⏰ 喜马拉雅极速版", message)
 
 
 if __name__ == "__main__":
